@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>看见</title>
+<title>好词好句收藏夹</title>
 <style>
-  :root{--gap:12px;--radius:10px}
+  :root{--gap:12px;--radius:12px}
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:980px;margin:0 auto;padding:24px;background:#f7f7fb;color:#222}
   h1{font-size:22px;margin:0 0 16px}
   .card{background:#fff;border-radius:var(--radius);padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:var(--gap)}
   .row{display:flex;gap:var(--gap);flex-wrap:wrap}
   .row>*{flex:1 1 260px}
-  input,textarea,select,button{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:14px}
+  input,textarea,select,button{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;background:#fff;font-size:14px}
   textarea{min-height:80px;resize:vertical}
   button{cursor:pointer}
   button.primary{background:#222;color:#fff;border-color:#222}
@@ -19,16 +19,21 @@
   .quote{white-space:pre-wrap;line-height:1.6}
   .muted{color:#666;font-size:12px}
   .tag{display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;margin-right:6px;margin-top:6px;background:#fafafa;font-size:12px}
-  .toolbar{display:flex;gap:var(--gap);flex-wrap:wrap}
+  .toolbar{display:flex;gap:var(--gap);flex-wrap:wrap;align-items:center}
   .actions{display:flex;gap:8px;flex-wrap:wrap}
   .list-empty{padding:24px;text-align:center;color:#777}
   .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #ddd;background:#fff;border-radius:999px;padding:6px 10px;margin:4px 6px 0 0;font-size:12px;cursor:pointer}
   .pill.active{border-color:#222;background:#222;color:#fff}
+  .status{font-size:12px;color:#555}
+  .status.ok{color:#0a7c2f}
+  .status.warn{color:#b8860b}
+  .divider{height:1px;background:linear-gradient(90deg,#eee,transparent);margin:10px 0}
 </style>
 </head>
 <body>
   <h1>好词好句收藏夹</h1>
 
+  <!-- 顶部工具栏（含导出/导入/随机/清空 + 登录与同步区） -->
   <div class="card">
     <div class="toolbar">
       <input id="search" placeholder="搜索：句子 / 作者 / 标签…" />
@@ -38,10 +43,21 @@
         <button id="randomBtn" class="ghost">来一句 🎲</button>
         <button id="clearBtn" class="ghost" title="清空所有数据（谨慎）">清空</button>
       </div>
+
+      <!-- 登录 & 同步区（可见） -->
+      <div class="divider" style="flex-basis:100%"></div>
+      <div class="row" style="align-items:center">
+        <input id="emailInput" placeholder="邮箱登录以开启云同步（Magic Link）" />
+        <button id="loginBtn" class="ghost" style="flex:0 0 140px">发送登录邮件</button>
+        <button id="logoutBtn" class="ghost" style="flex:0 0 90px;display:none">退出</button>
+        <button id="syncBtn" class="ghost" style="flex:0 0 90px">同步</button>
+        <div id="authState" class="status" style="flex:1 1 200px;text-align:right">未登录</div>
+      </div>
     </div>
     <div id="tagBar" class="row" style="margin-top:10px"></div>
   </div>
 
+  <!-- 录入区 -->
   <div class="card">
     <div class="row">
       <textarea id="text" placeholder="在此粘贴好词好句…"></textarea>
@@ -64,12 +80,14 @@
     </div>
   </div>
 
+  <!-- 列表区 -->
   <div id="list"></div>
 
 <script>
+/* ===================== 本地应用逻辑（原有功能） ===================== */
 const KEY = "quotes.v1";
-
 const el = id => document.getElementById(id);
+
 const state = {
   items: load(),
   editingId: null,
@@ -77,14 +95,10 @@ const state = {
 };
 
 function load(){
-  try{
-    return JSON.parse(localStorage.getItem(KEY)) || [];
-  }catch(e){ return []; }
+  try{ return JSON.parse(localStorage.getItem(KEY)) || []; }
+  catch{ return []; }
 }
-function persist(){
-  localStorage.setItem(KEY, JSON.stringify(state.items));
-}
-
+function persist(){ localStorage.setItem(KEY, JSON.stringify(state.items)); }
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
 function nowISO(){ return new Date().toISOString().slice(0,10); }
 
@@ -169,6 +183,8 @@ function clearForm(){
   el("saveBtn").textContent = "保存";
 }
 
+function splitTags(s){ return s.split(",").map(x=>x.trim()).filter(Boolean); }
+
 function saveItem(){
   const text = el("text").value.trim();
   if(!text){ alert("请先填写句子内容"); return; }
@@ -184,24 +200,16 @@ function saveItem(){
 
   if(state.editingId){
     const idx = state.items.findIndex(x=>x.id===state.editingId);
-    if(idx>-1){
-      state.items[idx] = {...state.items[idx], ...it};
-    }
+    if(idx>-1){ state.items[idx] = {...state.items[idx], ...it, updatedAt: new Date().toISOString() }; }
   }else{
-    state.items.unshift({
-      id: uid(),
-      createdAt: nowISO(),
-      ...it
-    });
+    state.items.unshift({ id: uid(), createdAt: nowISO(), updatedAt: new Date().toISOString(), ...it });
   }
   persist();
   clearForm();
   render();
+  // —— 云同步队列（在下方 Supabase 段中接管） ——
 }
 
-function splitTags(s){
-  return s.split(",").map(x=>x.trim()).filter(Boolean);
-}
 function fillForm(it){
   el("text").value = it.text||"";
   el("author").value = it.author||"";
@@ -226,6 +234,7 @@ function onListClick(e){
     if(confirm("确定删除这条收藏吗？")){
       state.items = state.items.filter(x=>x.id!==id);
       persist(); render();
+      // —— 云同步队列（在下方 Supabase 段中接管） ——
     }
   }else if(act==="edit"){
     fillForm(item);
@@ -252,17 +261,12 @@ function importJSON(file){
     try{
       const arr = JSON.parse(reader.result);
       if(!Array.isArray(arr)) throw new Error("格式不正确");
-      // 简单合并去重（按 id）
       const map = new Map(state.items.map(x=>[x.id,x]));
-      for(const it of arr){
-        if(it && it.id){ map.set(it.id, it); }
-      }
+      for(const it of arr){ if(it && it.id){ map.set(it.id, it); } }
       state.items = [...map.values()];
       persist(); render();
       alert("导入完成");
-    }catch(e){
-      alert("导入失败："+e.message);
-    }
+    }catch(e){ alert("导入失败："+e.message); }
   };
   reader.readAsText(file);
 }
@@ -273,9 +277,7 @@ function randomOne(){
   alert((it.text||"") + (it.author? "\n\n— "+it.author:""));
 }
 
-function escapeHTML(s){
-  return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+function escapeHTML(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // events
 el("saveBtn").onclick = saveItem;
@@ -288,56 +290,48 @@ el("randomBtn").onclick = randomOne;
 el("clearBtn").onclick = ()=> { if(confirm("这会清空本地所有收藏，确定吗？")){ state.items=[]; persist(); render(); } };
 
 render();
-  <!-- Supabase 云同步脚本 -->
+</script>
+
+<!-- ===================== Supabase 云同步 ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+/** 1) 初始化 Supabase（你的项目参数） */
 const SUPABASE_URL = "https://wwtluqwioyngzawmkvam.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3dGx1cXdpb3luZ3phd21rdmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwMjc4NjEsImV4cCI6MjA3NjYwMzg2MX0.Jog8YR9_5XLK36LBPdzOP2ZXMkMRPhAeith0bPuqw8c";
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/** ========== 登录/同步UI ========== */
-(function addAuthUI(){
-  const toolbar = document.querySelector(".toolbar") || document.body;
-  const box = document.createElement("div");
-  box.style.display="flex"; box.style.gap="8px"; box.style.flex="1 1 280px";
-  box.innerHTML = `
-    <input id="emailInput" placeholder="邮箱登录以开启云同步（Magic Link）" />
-    <button id="loginBtn" class="ghost">发送登录邮件</button>
-    <button id="logoutBtn" class="ghost" style="display:none">退出</button>
-    <button id="syncBtn" class="ghost">同步</button>
-  `;
-  toolbar.appendChild(box);
+/** 2) 登录/退出/同步 按钮逻辑 + 状态提示 */
+const $login = document.getElementById("loginBtn");
+const $logout = document.getElementById("logoutBtn");
+const $sync = document.getElementById("syncBtn");
+const $email = document.getElementById("emailInput");
+const $state = document.getElementById("authState");
 
-  document.getElementById("loginBtn").onclick = async () => {
-    const email = document.getElementById("emailInput").value.trim();
-    if(!email) return alert("请输入邮箱");
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options:{ emailRedirectTo: location.href }
-    });
-    if(error) alert("发送失败："+error.message);
-    else alert("登录邮件已发送，请去邮箱点击链接完成登录。");
-  };
+$login.onclick = async () => {
+  const email = $email.value.trim();
+  if(!email) return alert("请输入邮箱");
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href }});
+  if(error) alert("发送失败："+error.message);
+  else alert("登录邮件已发送，请到邮箱点击链接完成登录。");
+};
+$logout.onclick = async () => { await sb.auth.signOut(); setAuthUI(null); };
+$sync.onclick = syncNow;
 
-  document.getElementById("logoutBtn").onclick = async () => {
-    await sb.auth.signOut();
-    document.getElementById("logoutBtn").style.display="none";
-    document.getElementById("loginBtn").style.display="";
-    alert("已退出登录（本地数据仍在此设备）");
-  };
+sb.auth.onAuthStateChange((_evt, sess)=> setAuthUI(sess?.user || null));
+(async () => { const s = await sb.auth.getSession(); setAuthUI(s.data.session?.user||null); })();
 
-  document.getElementById("syncBtn").onclick = syncNow;
+function setAuthUI(user){
+  if(user){
+    $login.style.display="none"; $logout.style.display=""; $email.style.display="none";
+    $state.textContent = `已登录：${user.email}`; $state.className="status ok";
+    syncNow(); // 登录后自动同步一次
+  }else{
+    $login.style.display=""; $logout.style.display="none"; $email.style.display="";
+    $state.textContent = "未登录"; $state.className="status warn";
+  }
+}
 
-  sb.auth.onAuthStateChange((_evt, session)=>{
-    const loggedIn = !!session?.user;
-    document.getElementById("logoutBtn").style.display = loggedIn? "":"none";
-    document.getElementById("loginBtn").style.display = loggedIn? "none":"";
-    if(loggedIn) syncNow();
-  });
-})();
-
-/** ========== 离线队列：保存/删除后入队 ========== */
+/** 3) 离线队列：保存/删除动作入队，待同步 */
 const QUEUE_KEY = "quotes.queue.v1";
 const getQueue = ()=> { try{return JSON.parse(localStorage.getItem(QUEUE_KEY))||[]}catch{return[]} };
 const setQueue = q => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
@@ -347,14 +341,13 @@ saveItem = function(){
   const before = JSON.stringify(state.items||[]);
   _saveItemRaw();
   const after = JSON.parse(JSON.stringify(state.items||[]));
-  const bset = new Set(JSON.parse(before).map(x=>x.id));
-  const diff = after.find(x=>!bset.has(x.id)) || after[0];
+  const beforeSet = new Set(JSON.parse(before).map(x=>x.id));
+  const diff = after.find(x=>!beforeSet.has(x.id)) || after[0];
   if(diff){
     diff.updatedAt = new Date().toISOString();
     const q = getQueue(); q.push({op:"upsert", row:diff}); setQueue(q);
   }
 };
-
 document.addEventListener("click", (e)=>{
   if(e.target?.dataset?.act === "del"){
     const id = e.target.dataset.id;
@@ -362,17 +355,19 @@ document.addEventListener("click", (e)=>{
   }
 }, true);
 
-/** ========== 同步逻辑 ========== */
+/** 4) 同步：本地与云端合并，谁新用谁（last-write-wins） */
 async function syncNow(){
-  const { data:session } = await sb.auth.getSession();
-  const user = session?.session?.user;
-  if(!user){ alert("请先登录邮箱"); return; }
+  const sess = await sb.auth.getSession();
+  const user = sess?.data?.session?.user;
+  if(!user){ alert("请先登录邮箱以开启同步"); return; }
 
+  // 4.1 拉取云端
   const { data:remote, error } = await sb.from("quotes").select("*").order("updated_at",{ascending:false});
   if(error){ console.error(error); alert("云端拉取失败："+error.message); return; }
 
+  // 4.2 合并
   const local = load();
-  const map = new Map();
+  const map = new Map(); // id -> row（混合本地/远端结构）
   const put = (r)=>{ if(!r?.id) return;
     const existed = map.get(r.id);
     const a = (r.updatedAt||r.updated_at||r.createdAt||r.created_at||"");
@@ -381,6 +376,7 @@ async function syncNow(){
   };
   remote.forEach(put); local.forEach(put);
 
+  // 4.3 上行离线队列
   const q = getQueue();
   for(const item of q){
     if(item.op==="upsert"){
@@ -393,11 +389,14 @@ async function syncNow(){
     }
   }
   setQueue([]);
+
+  // 4.4 落回本地并刷新
   state.items = [...map.values()].filter(r=>!r.deleted).map(fromRemote);
   persist(); render();
-  alert("同步完成 ✅");
+  console.log("Sync done");
 }
 
+/** 结构转换：前端 <-> 数据库 */
 function normalizeRow(it){
   return {
     id: it.id,
@@ -428,10 +427,12 @@ function fromRemote(r){
     deleted: !!r.deleted
   };
 }
-</script>
 
+/** 5) 自动每 5 分钟同步一次（登录后） */
+setInterval(async ()=>{
+  const s = await sb.auth.getSession();
+  if(s?.data?.session?.user){ syncNow(); }
+}, 5*60*1000);
 </script>
 </body>
 </html>
-
-
