@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>好词好句收藏夹</title>
+<style>
+  :root{--gap:12px;--radius:10px}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:980px;margin:0 auto;padding:24px;background:#f7f7fb;color:#222}
+  h1{font-size:22px;margin:0 0 16px}
+  .card{background:#fff;border-radius:var(--radius);padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:var(--gap)}
+  .row{display:flex;gap:var(--gap);flex-wrap:wrap}
+  .row>*{flex:1 1 260px}
+  input,textarea,select,button{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:14px}
+  textarea{min-height:80px;resize:vertical}
+  button{cursor:pointer}
+  button.primary{background:#222;color:#fff;border-color:#222}
+  button.ghost{background:#fff}
+  .quote{white-space:pre-wrap;line-height:1.6}
+  .muted{color:#666;font-size:12px}
+  .tag{display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;margin-right:6px;margin-top:6px;background:#fafafa;font-size:12px}
+  .toolbar{display:flex;gap:var(--gap);flex-wrap:wrap}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .list-empty{padding:24px;text-align:center;color:#777}
+  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #ddd;background:#fff;border-radius:999px;padding:6px 10px;margin:4px 6px 0 0;font-size:12px;cursor:pointer}
+  .pill.active{border-color:#222;background:#222;color:#fff}
+</style>
+</head>
+<body>
+  <h1>好词好句收藏夹</h1>
+
+  <div class="card">
+    <div class="toolbar">
+      <input id="search" placeholder="搜索：句子 / 作者 / 标签…" />
+      <div class="actions" style="flex:1 1 280px">
+        <button id="exportBtn" class="ghost">导出 JSON</button>
+        <input id="importFile" type="file" accept=".json" />
+        <button id="randomBtn" class="ghost">来一句 🎲</button>
+        <button id="clearBtn" class="ghost" title="清空所有数据（谨慎）">清空</button>
+      </div>
+    </div>
+    <div id="tagBar" class="row" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <textarea id="text" placeholder="在此粘贴好词好句…"></textarea>
+      <input id="author" placeholder="作者/出处（可选）" />
+      <input id="link" placeholder="来源链接（可选）" />
+      <input id="tags" placeholder="标签（用逗号分隔）" />
+      <select id="tone">
+        <option value="">情绪/语气（可选）</option>
+        <option>温柔</option><option>激励</option><option>坚韧</option><option>幽默</option><option>清醒</option>
+      </select>
+      <select id="lang">
+        <option value="">语言（可选）</option>
+        <option>中文</option><option>English</option><option>日本語</option>
+      </select>
+      <input id="rating" type="number" min="1" max="5" step="1" placeholder="评分 1-5（可选）" />
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button id="saveBtn" class="primary">保存</button>
+      <button id="resetBtn" class="ghost">重置表单</button>
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+<script>
+const KEY = "quotes.v1";
+
+const el = id => document.getElementById(id);
+const state = {
+  items: load(),
+  editingId: null,
+  activeTag: ""
+};
+
+function load(){
+  try{
+    return JSON.parse(localStorage.getItem(KEY)) || [];
+  }catch(e){ return []; }
+}
+function persist(){
+  localStorage.setItem(KEY, JSON.stringify(state.items));
+}
+
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+function nowISO(){ return new Date().toISOString().slice(0,10); }
+
+function render(){
+  renderTagBar();
+  const q = el("search").value.trim().toLowerCase();
+  const activeTag = state.activeTag;
+  const list = el("list");
+  list.innerHTML = "";
+
+  let items = [...state.items].sort((a,b)=> (b.createdAt||"").localeCompare(a.createdAt||""));
+
+  if(q){
+    items = items.filter(it =>
+      (it.text||"").toLowerCase().includes(q) ||
+      (it.author||"").toLowerCase().includes(q) ||
+      (it.tags||[]).join(",").toLowerCase().includes(q)
+    );
+  }
+  if(activeTag){
+    items = items.filter(it => (it.tags||[]).includes(activeTag));
+  }
+
+  if(items.length===0){
+    const d = document.createElement("div");
+    d.className="list-empty";
+    d.textContent = "没有内容，先收藏第一句吧 ✨";
+    list.appendChild(d);
+    return;
+  }
+
+  for(const it of items){
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="quote">${escapeHTML(it.text)}</div>
+      <div class="muted" style="margin-top:8px">
+        ${it.author? `— ${escapeHTML(it.author)}`:""}
+        ${it.link? ` · <a href="${it.link}" target="_blank">链接</a>`:""}
+        ${it.rating? ` · 评分 ${it.rating}/5`:""}
+        ${it.lang? ` · ${it.lang}`:""}
+        ${it.tone? ` · ${it.tone}`:""}
+        · ${it.createdAt || ""}
+      </div>
+      <div style="margin-top:6px">${(it.tags||[]).map(t=>`<span class="tag">${escapeHTML(t)}</span>`).join("")}</div>
+      <div class="actions" style="margin-top:10px">
+        <button data-act="copy" data-id="${it.id}" class="ghost">复制句子</button>
+        <button data-act="edit" data-id="${it.id}" class="ghost">编辑</button>
+        <button data-act="del" data-id="${it.id}" class="ghost">删除</button>
+      </div>
+    `;
+    list.appendChild(card);
+  }
+}
+
+function renderTagBar(){
+  const all = new Set();
+  state.items.forEach(it => (it.tags||[]).forEach(t=> all.add(t)));
+  const bar = el("tagBar");
+  bar.innerHTML = "";
+  if(all.size===0){ return; }
+  const mk = (name, active)=> {
+    const b = document.createElement("button");
+    b.className = "pill" + (active?" active":"");
+    b.textContent = name;
+    b.onclick = ()=>{ state.activeTag = (state.activeTag===name? "": name); render(); };
+    return b;
+  };
+  bar.appendChild(mk("全部", state.activeTag===""));
+  [...all].sort().forEach(t => bar.appendChild(mk(t, state.activeTag===t)));
+}
+
+function clearForm(){
+  el("text").value="";
+  el("author").value="";
+  el("link").value="";
+  el("tags").value="";
+  el("tone").value="";
+  el("lang").value="";
+  el("rating").value="";
+  state.editingId = null;
+  el("saveBtn").textContent = "保存";
+}
+
+function saveItem(){
+  const text = el("text").value.trim();
+  if(!text){ alert("请先填写句子内容"); return; }
+  const it = {
+    text,
+    author: el("author").value.trim(),
+    link: el("link").value.trim(),
+    tags: splitTags(el("tags").value),
+    tone: el("tone").value,
+    lang: el("lang").value,
+    rating: Number(el("rating").value||""),
+  };
+
+  if(state.editingId){
+    const idx = state.items.findIndex(x=>x.id===state.editingId);
+    if(idx>-1){
+      state.items[idx] = {...state.items[idx], ...it};
+    }
+  }else{
+    state.items.unshift({
+      id: uid(),
+      createdAt: nowISO(),
+      ...it
+    });
+  }
+  persist();
+  clearForm();
+  render();
+}
+
+function splitTags(s){
+  return s.split(",").map(x=>x.trim()).filter(Boolean);
+}
+function fillForm(it){
+  el("text").value = it.text||"";
+  el("author").value = it.author||"";
+  el("link").value = it.link||"";
+  el("tags").value = (it.tags||[]).join(", ");
+  el("tone").value = it.tone||"";
+  el("lang").value = it.lang||"";
+  el("rating").value = it.rating||"";
+  state.editingId = it.id;
+  el("saveBtn").textContent = "保存修改";
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function onListClick(e){
+  if(e.target.tagName!=="BUTTON") return;
+  const act = e.target.dataset.act;
+  const id = e.target.dataset.id;
+  const item = state.items.find(x=>x.id===id);
+  if(!item) return;
+
+  if(act==="del"){
+    if(confirm("确定删除这条收藏吗？")){
+      state.items = state.items.filter(x=>x.id!==id);
+      persist(); render();
+    }
+  }else if(act==="edit"){
+    fillForm(item);
+  }else if(act==="copy"){
+    navigator.clipboard.writeText(item.text).then(()=> {
+      e.target.textContent="已复制";
+      setTimeout(()=> e.target.textContent="复制句子",1000);
+    });
+  }
+}
+
+function exportJSON(){
+  const data = JSON.stringify(state.items, null, 2);
+  const blob = new Blob([data], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "quotes-backup.json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const arr = JSON.parse(reader.result);
+      if(!Array.isArray(arr)) throw new Error("格式不正确");
+      // 简单合并去重（按 id）
+      const map = new Map(state.items.map(x=>[x.id,x]));
+      for(const it of arr){
+        if(it && it.id){ map.set(it.id, it); }
+      }
+      state.items = [...map.values()];
+      persist(); render();
+      alert("导入完成");
+    }catch(e){
+      alert("导入失败："+e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function randomOne(){
+  if(state.items.length===0){ alert("还没有内容"); return; }
+  const it = state.items[Math.floor(Math.random()*state.items.length)];
+  alert((it.text||"") + (it.author? "\n\n— "+it.author:""));
+}
+
+function escapeHTML(s){
+  return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// events
+el("saveBtn").onclick = saveItem;
+el("resetBtn").onclick = clearForm;
+el("list").addEventListener("click", onListClick);
+el("search").addEventListener("input", render);
+el("exportBtn").onclick = exportJSON;
+el("importFile").addEventListener("change", e => e.target.files[0] && importJSON(e.target.files[0]));
+el("randomBtn").onclick = randomOne;
+el("clearBtn").onclick = ()=> { if(confirm("这会清空本地所有收藏，确定吗？")){ state.items=[]; persist(); render(); } };
+
+render();
+</script>
+</body>
+</html>
