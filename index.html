@@ -1,63 +1,131 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>好词好句收藏夹</title>
 <style>
-  :root{--gap:12px;--radius:12px}
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:980px;margin:0 auto;padding:24px;background:#f7f7fb;color:#222}
-  h1{font-size:22px;margin:0 0 16px}
-  .card{background:#fff;border-radius:var(--radius);padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:var(--gap)}
+  :root{
+    --gap:14px; --radius:14px; --primary:#4b7bec; --bg:#f7f9fc; --card:#fff; --text:#222; --muted:#666; --line:#e8ebf2;
+  }
+  [data-theme="dark"]{
+    --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --line:#273246; --primary:#7aa2ff;
+  }
+
+  html,body{height:100%}
+  body{
+    font-family:"Inter","Noto Sans SC",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+    max-width:980px;margin:0 auto;padding:16px;
+  }
+
+  /* 顶部导航 */
+  .nav{
+    display:flex;align-items:center;gap:12px;
+    background:var(--card); border-radius:16px; padding:10px 14px; margin:8px 0 16px;
+    box-shadow:0 4px 14px rgba(0,0,0,.06); position:sticky; top:8px; z-index:5;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#64b5f6)}
+  .title{font-weight:700}
+  .nav-right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+
+  .btn{border:1px solid var(--line); background:transparent; color:var(--text);
+    border-radius:10px; padding:8px 12px; font-size:14px; cursor:pointer; transition:.2s}
+  .btn:hover{border-color:var(--primary); color:var(--primary)}
+  .btn.primary{background:var(--primary); color:#fff; border-color:transparent}
+  .btn.primary:hover{opacity:.95}
+  .btn.icon{width:40px;height:36px;display:flex;align-items:center;justify-content:center}
+
+  h1{display:none} /* 用导航标题取代 */
+
+  .card{
+    background:var(--card); border-radius:var(--radius);
+    padding:20px; margin-bottom:var(--gap);
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+    transition:transform .2s, box-shadow .2s;
+  }
+  .card:hover{transform:translateY(-1px); box-shadow:0 8px 22px rgba(0,0,0,.08)}
+
   .row{display:flex;gap:var(--gap);flex-wrap:wrap}
   .row>*{flex:1 1 260px}
-  input,textarea,select,button{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;background:#fff;font-size:14px}
-  textarea{min-height:80px;resize:vertical}
-  button{cursor:pointer}
-  button.primary{background:#222;color:#fff;border-color:#222}
-  button.ghost{background:#fff}
-  .quote{white-space:pre-wrap;line-height:1.6}
-  .muted{color:#666;font-size:12px}
-  .tag{display:inline-block;padding:2px 8px;border:1px solid #ddd;border-radius:999px;margin-right:6px;margin-top:6px;background:#fafafa;font-size:12px}
+
+  input,textarea,select,button{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    background:transparent; color:var(--text); font-size:14px; transition:border .2s, box-shadow .2s
+  }
+  input:focus,textarea:focus,select:focus{border-color:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 30%, transparent); outline:none}
+  textarea{min-height:90px; resize:vertical}
+  a{color:var(--primary); text-decoration:none}
+  a:hover{text-decoration:underline}
+
   .toolbar{display:flex;gap:var(--gap);flex-wrap:wrap;align-items:center}
   .actions{display:flex;gap:8px;flex-wrap:wrap}
-  .list-empty{padding:24px;text-align:center;color:#777}
-  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #ddd;background:#fff;border-radius:999px;padding:6px 10px;margin:4px 6px 0 0;font-size:12px;cursor:pointer}
-  .pill.active{border-color:#222;background:#222;color:#fff}
-  .status{font-size:12px;color:#555}
-  .status.ok{color:#0a7c2f}
-  .status.warn{color:#b8860b}
-  .divider{height:1px;background:linear-gradient(90deg,#eee,transparent);margin:10px 0}
+  .divider{height:1px;background:linear-gradient(90deg,var(--line),transparent);margin:10px 0}
+  .status{font-size:12px;color:var(--muted)}
+  .status.ok{color:#22c55e}
+  .status.warn{color:#eab308}
+
+  .quote{white-space:pre-wrap; line-height:1.7}
+  .muted{color:var(--muted); font-size:12px}
+  .tag{display:inline-block;padding:3px 8px;border:1px solid var(--line);border-radius:999px;margin-right:6px;margin-top:6px;background:color-mix(in srgb,var(--line) 40%, transparent); font-size:12px}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 10px;margin:4px 6px 0 0;font-size:12px;cursor:pointer}
+  .pill.active{border-color:var(--primary); background:color-mix(in srgb,var(--primary) 20%, transparent); color:var(--text)}
+
+  .list-empty{padding:24px;text-align:center;color:var(--muted)}
+
+  /* 手机端 */
+  @media (max-width: 640px){
+    body{padding:10px}
+    .row>*{flex:1 1 100%}
+    .nav-right{gap:6px}
+  }
 </style>
 </head>
 <body>
-  <h1>好词好句收藏夹</h1>
 
-  <!-- 顶部工具栏（含导出/导入/随机/清空 + 登录与同步区） -->
+  <!-- 顶部导航 -->
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div class="title">好词好句收藏夹</div>
+    </div>
+    <div class="nav-right">
+      <button id="toggleTheme" class="btn icon" title="深浅色切换">🌙</button>
+      <button id="navSync" class="btn">同步</button>
+      <button id="navExport" class="btn">导出</button>
+      <label class="btn" for="navImportFile">导入</label>
+      <input id="navImportFile" type="file" accept=".json" style="display:none" />
+    </div>
+  </div>
+
+  <!-- 顶部工具栏（搜索、备份、随机、清空 + 登录） -->
   <div class="card">
     <div class="toolbar">
       <input id="search" placeholder="搜索：句子 / 作者 / 标签…" />
       <div class="actions" style="flex:1 1 280px">
-        <button id="exportBtn" class="ghost">导出 JSON</button>
+        <button id="exportBtn" class="btn">导出 JSON</button>
         <input id="importFile" type="file" accept=".json" />
-        <button id="randomBtn" class="ghost">来一句 🎲</button>
-        <button id="clearBtn" class="ghost" title="清空所有数据（谨慎）">清空</button>
+        <button id="randomBtn" class="btn">来一句 🎲</button>
+        <button id="clearBtn" class="btn" title="清空所有数据（谨慎）">清空</button>
       </div>
 
-      <!-- 登录 & 同步区（可见） -->
       <div class="divider" style="flex-basis:100%"></div>
+
+      <!-- 登录 & 同步区 -->
       <div class="row" style="align-items:center">
-        <input id="emailInput" placeholder="邮箱登录以开启云同步（Magic Link）" />
-        <button id="loginBtn" class="ghost" style="flex:0 0 140px">发送登录邮件</button>
-        <button id="logoutBtn" class="ghost" style="flex:0 0 90px;display:none">退出</button>
-        <button id="syncBtn" class="ghost" style="flex:0 0 90px">同步</button>
+        <input id="emailInput" placeholder="输入邮箱，接收登录邮件（云同步需要登录）" />
+        <button id="loginBtn" class="btn" style="flex:0 0 160px">发送登录邮件</button>
+        <button id="logoutBtn" class="btn" style="flex:0 0 90px;display:none">退出</button>
+        <button id="syncBtn" class="btn" style="flex:0 0 90px">同步</button>
         <div id="authState" class="status" style="flex:1 1 200px;text-align:right">未登录</div>
       </div>
     </div>
     <div id="tagBar" class="row" style="margin-top:10px"></div>
   </div>
 
-  <!-- 录入区 -->
+  <!-- 录入 -->
   <div class="card">
     <div class="row">
       <textarea id="text" placeholder="在此粘贴好词好句…"></textarea>
@@ -75,16 +143,23 @@
       <input id="rating" type="number" min="1" max="5" step="1" placeholder="评分 1-5（可选）" />
     </div>
     <div class="actions" style="margin-top:12px">
-      <button id="saveBtn" class="primary">保存</button>
-      <button id="resetBtn" class="ghost">重置表单</button>
+      <button id="saveBtn" class="btn primary">保存</button>
+      <button id="resetBtn" class="btn">重置表单</button>
     </div>
   </div>
 
-  <!-- 列表区 -->
+  <!-- 列表 -->
   <div id="list"></div>
 
 <script>
-/* ===================== 本地应用逻辑（原有功能） ===================== */
+/* ===================== 主题切换（自动记忆） ===================== */
+const themeToggleBtn = document.getElementById('toggleTheme');
+const THEME_KEY = 'quotes.theme';
+const applyTheme = (t)=>{ document.documentElement.setAttribute('data-theme', t); themeToggleBtn.textContent = t==='dark'?'☀️':'🌙'; localStorage.setItem(THEME_KEY,t); };
+applyTheme(localStorage.getItem(THEME_KEY)|| (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light'));
+themeToggleBtn.onclick = ()=> applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+
+/* ===================== 本地应用逻辑（你原有功能） ===================== */
 const KEY = "quotes.v1";
 const el = id => document.getElementById(id);
 
@@ -137,7 +212,7 @@ function render(){
       <div class="quote">${escapeHTML(it.text)}</div>
       <div class="muted" style="margin-top:8px">
         ${it.author? `— ${escapeHTML(it.author)}`:""}
-        ${it.link? ` · <a href="${it.link}" target="_blank">链接</a>`:""}
+        ${it.link? ` · <a href="${it.link}" target="_blank" rel="noopener">链接</a>`:""}
         ${it.rating? ` · 评分 ${it.rating}/5`:""}
         ${it.lang? ` · ${it.lang}`:""}
         ${it.tone? ` · ${it.tone}`:""}
@@ -145,9 +220,9 @@ function render(){
       </div>
       <div style="margin-top:6px">${(it.tags||[]).map(t=>`<span class="tag">${escapeHTML(t)}</span>`).join("")}</div>
       <div class="actions" style="margin-top:10px">
-        <button data-act="copy" data-id="${it.id}" class="ghost">复制句子</button>
-        <button data-act="edit" data-id="${it.id}" class="ghost">编辑</button>
-        <button data-act="del" data-id="${it.id}" class="ghost">删除</button>
+        <button data-act="copy" data-id="${it.id}" class="btn">复制句子</button>
+        <button data-act="edit" data-id="${it.id}" class="btn">编辑</button>
+        <button data-act="del" data-id="${it.id}" class="btn">删除</button>
       </div>
     `;
     list.appendChild(card);
@@ -280,42 +355,73 @@ function randomOne(){
 function escapeHTML(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // events
-el("saveBtn").onclick = saveItem;
-el("resetBtn").onclick = clearForm;
-el("list").addEventListener("click", onListClick);
-el("search").addEventListener("input", render);
-el("exportBtn").onclick = exportJSON;
-el("importFile").addEventListener("change", e => e.target.files[0] && importJSON(e.target.files[0]));
-el("randomBtn").onclick = randomOne;
-el("clearBtn").onclick = ()=> { if(confirm("这会清空本地所有收藏，确定吗？")){ state.items=[]; persist(); render(); } };
+document.getElementById("saveBtn").onclick = saveItem;
+document.getElementById("resetBtn").onclick = clearForm;
+document.getElementById("list").addEventListener("click", onListClick);
+document.getElementById("search").addEventListener("input", render);
+document.getElementById("exportBtn").onclick = exportJSON;
+document.getElementById("importFile").addEventListener("change", e => e.target.files[0] && importJSON(e.target.files[0]));
+document.getElementById("navExport").onclick = exportJSON;
+document.getElementById("navImportFile").addEventListener("change", e => e.target.files[0] && importJSON(e.target.files[0]));
+document.getElementById("randomBtn").onclick = randomOne;
+document.getElementById("clearBtn").onclick = ()=> { if(confirm("这会清空本地所有收藏，确定吗？")){ state.items=[]; persist(); render(); } };
+
+// 顶部导航的“同步”按钮复用
+document.getElementById("navSync").onclick = ()=> document.getElementById("syncBtn").click();
 
 render();
 </script>
 
-<!-- ===================== Supabase 云同步 ===================== -->
+<!-- ===================== Supabase 云同步（含手机登录修复） ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-/** 1) 初始化 Supabase（你的项目参数） */
+/** 1) 初始化 Supabase */
 const SUPABASE_URL = "https://wwtluqwioyngzawmkvam.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3dGx1cXdpb3luZ3phd21rdmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwMjc4NjEsImV4cCI6MjA3NjYwMzg2MX0.Jog8YR9_5XLK36LBPdzOP2ZXMkMRPhAeith0bPuqw8c";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/** 2) 登录/退出/同步 按钮逻辑 + 状态提示 */
+/** 2) 登录/退出/同步 + 状态提示（改进：倒计时、回跳识别） */
 const $login = document.getElementById("loginBtn");
 const $logout = document.getElementById("logoutBtn");
 const $sync = document.getElementById("syncBtn");
 const $email = document.getElementById("emailInput");
 const $state = document.getElementById("authState");
 
+// 改成你的线上地址（HTTPS），同时在 Supabase 控制台将其加入 Redirect URLs
+const REDIRECT_URL = "REDIRECT_URL_HERE";
+
 $login.onclick = async () => {
   const email = $email.value.trim();
   if(!email) return alert("请输入邮箱");
-  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href }});
-  if(error) alert("发送失败："+error.message);
-  else alert("登录邮件已发送，请到邮箱点击链接完成登录。");
+  $login.disabled = true;
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: REDIRECT_URL }});
+  if(error){
+    alert("发送失败："+error.message);
+    $login.disabled = false;
+  }else{
+    // 30s 按钮倒计时，避免重复点击
+    let t = 30; $login.textContent = `已发送（${t}s）`;
+    const timer = setInterval(()=>{ t--; $login.textContent = `已发送（${t}s）`; if(t<=0){ clearInterval(timer); $login.textContent="发送登录邮件"; $login.disabled=false; }}, 1000);
+    alert("登录邮件已发送，请在手机邮箱中点击链接完成登录。");
+  }
 };
 $logout.onclick = async () => { await sb.auth.signOut(); setAuthUI(null); };
 $sync.onclick = syncNow;
+
+// 处理从邮箱回跳（hash 或 code 参数），并清理地址栏
+(async ()=>{
+  try{
+    if (location.search.includes("code=")) {
+      // 新版 code 方式
+      await sb.auth.exchangeCodeForSession(window.location.href);
+      history.replaceState({}, document.title, REDIRECT_URL);
+    } else if (location.hash.includes("access_token")) {
+      // 旧版 hash 方式
+      await sb.auth.getSessionFromUrl({ storeSession:true });
+      history.replaceState({}, document.title, REDIRECT_URL);
+    }
+  }catch(e){ console.error("处理回跳失败：", e); }
+})();
 
 sb.auth.onAuthStateChange((_evt, sess)=> setAuthUI(sess?.user || null));
 (async () => { const s = await sb.auth.getSession(); setAuthUI(s.data.session?.user||null); })();
@@ -331,7 +437,7 @@ function setAuthUI(user){
   }
 }
 
-/** 3) 离线队列：保存/删除动作入队，待同步 */
+/** 3) 离线队列（保存/删除入队等待上行） */
 const QUEUE_KEY = "quotes.queue.v1";
 const getQueue = ()=> { try{return JSON.parse(localStorage.getItem(QUEUE_KEY))||[]}catch{return[]} };
 const setQueue = q => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
@@ -355,19 +461,19 @@ document.addEventListener("click", (e)=>{
   }
 }, true);
 
-/** 4) 同步：本地与云端合并，谁新用谁（last-write-wins） */
+/** 4) 同步（合并：谁新用谁） */
 async function syncNow(){
   const sess = await sb.auth.getSession();
   const user = sess?.data?.session?.user;
   if(!user){ alert("请先登录邮箱以开启同步"); return; }
 
-  // 4.1 拉取云端
+  // 拉取云端
   const { data:remote, error } = await sb.from("quotes").select("*").order("updated_at",{ascending:false});
   if(error){ console.error(error); alert("云端拉取失败："+error.message); return; }
 
-  // 4.2 合并
+  // 合并
   const local = load();
-  const map = new Map(); // id -> row（混合本地/远端结构）
+  const map = new Map();
   const put = (r)=>{ if(!r?.id) return;
     const existed = map.get(r.id);
     const a = (r.updatedAt||r.updated_at||r.createdAt||r.created_at||"");
@@ -376,7 +482,7 @@ async function syncNow(){
   };
   remote.forEach(put); local.forEach(put);
 
-  // 4.3 上行离线队列
+  // 上行离线队列
   const q = getQueue();
   for(const item of q){
     if(item.op==="upsert"){
@@ -390,7 +496,7 @@ async function syncNow(){
   }
   setQueue([]);
 
-  // 4.4 落回本地并刷新
+  // 落回本地并刷新
   state.items = [...map.values()].filter(r=>!r.deleted).map(fromRemote);
   persist(); render();
   console.log("Sync done");
@@ -428,7 +534,7 @@ function fromRemote(r){
   };
 }
 
-/** 5) 自动每 5 分钟同步一次（登录后） */
+/** 5) 登录后每 5 分钟自动同步 */
 setInterval(async ()=>{
   const s = await sb.auth.getSession();
   if(s?.data?.session?.user){ syncNow(); }
