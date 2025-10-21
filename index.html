@@ -288,7 +288,150 @@ el("randomBtn").onclick = randomOne;
 el("clearBtn").onclick = ()=> { if(confirm("这会清空本地所有收藏，确定吗？")){ state.items=[]; persist(); render(); } };
 
 render();
+  <!-- Supabase 云同步脚本 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://wwtluqwioyngzawmkvam.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3dGx1cXdpb3luZ3phd21rdmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwMjc4NjEsImV4cCI6MjA3NjYwMzg2MX0.Jog8YR9_5XLK36LBPdzOP2ZXMkMRPhAeith0bPuqw8c";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/** ========== 登录/同步UI ========== */
+(function addAuthUI(){
+  const toolbar = document.querySelector(".toolbar") || document.body;
+  const box = document.createElement("div");
+  box.style.display="flex"; box.style.gap="8px"; box.style.flex="1 1 280px";
+  box.innerHTML = `
+    <input id="emailInput" placeholder="邮箱登录以开启云同步（Magic Link）" />
+    <button id="loginBtn" class="ghost">发送登录邮件</button>
+    <button id="logoutBtn" class="ghost" style="display:none">退出</button>
+    <button id="syncBtn" class="ghost">同步</button>
+  `;
+  toolbar.appendChild(box);
+
+  document.getElementById("loginBtn").onclick = async () => {
+    const email = document.getElementById("emailInput").value.trim();
+    if(!email) return alert("请输入邮箱");
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options:{ emailRedirectTo: location.href }
+    });
+    if(error) alert("发送失败："+error.message);
+    else alert("登录邮件已发送，请去邮箱点击链接完成登录。");
+  };
+
+  document.getElementById("logoutBtn").onclick = async () => {
+    await sb.auth.signOut();
+    document.getElementById("logoutBtn").style.display="none";
+    document.getElementById("loginBtn").style.display="";
+    alert("已退出登录（本地数据仍在此设备）");
+  };
+
+  document.getElementById("syncBtn").onclick = syncNow;
+
+  sb.auth.onAuthStateChange((_evt, session)=>{
+    const loggedIn = !!session?.user;
+    document.getElementById("logoutBtn").style.display = loggedIn? "":"none";
+    document.getElementById("loginBtn").style.display = loggedIn? "none":"";
+    if(loggedIn) syncNow();
+  });
+})();
+
+/** ========== 离线队列：保存/删除后入队 ========== */
+const QUEUE_KEY = "quotes.queue.v1";
+const getQueue = ()=> { try{return JSON.parse(localStorage.getItem(QUEUE_KEY))||[]}catch{return[]} };
+const setQueue = q => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+
+const _saveItemRaw = saveItem;
+saveItem = function(){
+  const before = JSON.stringify(state.items||[]);
+  _saveItemRaw();
+  const after = JSON.parse(JSON.stringify(state.items||[]));
+  const bset = new Set(JSON.parse(before).map(x=>x.id));
+  const diff = after.find(x=>!bset.has(x.id)) || after[0];
+  if(diff){
+    diff.updatedAt = new Date().toISOString();
+    const q = getQueue(); q.push({op:"upsert", row:diff}); setQueue(q);
+  }
+};
+
+document.addEventListener("click", (e)=>{
+  if(e.target?.dataset?.act === "del"){
+    const id = e.target.dataset.id;
+    const q = getQueue(); q.push({op:"delete", id, updatedAt:new Date().toISOString()}); setQueue(q);
+  }
+}, true);
+
+/** ========== 同步逻辑 ========== */
+async function syncNow(){
+  const { data:session } = await sb.auth.getSession();
+  const user = session?.session?.user;
+  if(!user){ alert("请先登录邮箱"); return; }
+
+  const { data:remote, error } = await sb.from("quotes").select("*").order("updated_at",{ascending:false});
+  if(error){ console.error(error); alert("云端拉取失败："+error.message); return; }
+
+  const local = load();
+  const map = new Map();
+  const put = (r)=>{ if(!r?.id) return;
+    const existed = map.get(r.id);
+    const a = (r.updatedAt||r.updated_at||r.createdAt||r.created_at||"");
+    const b = existed&&(existed.updatedAt||existed.updated_at||existed.createdAt||existed.created_at||"");
+    if(!existed || a>b) map.set(r.id, r);
+  };
+  remote.forEach(put); local.forEach(put);
+
+  const q = getQueue();
+  for(const item of q){
+    if(item.op==="upsert"){
+      const row = normalizeRow(item.row);
+      const { error:e1 } = await sb.from("quotes").upsert(row, { onConflict:"id" });
+      if(e1) console.error(e1); else put(row);
+    }else if(item.op==="delete"){
+      const { error:e2 } = await sb.from("quotes").update({ deleted:true }).eq("id", item.id);
+      if(e2) console.error(e2); else map.delete(item.id);
+    }
+  }
+  setQueue([]);
+  state.items = [...map.values()].filter(r=>!r.deleted).map(fromRemote);
+  persist(); render();
+  alert("同步完成 ✅");
+}
+
+function normalizeRow(it){
+  return {
+    id: it.id,
+    text: it.text,
+    author: it.author || null,
+    link: it.link || null,
+    tags: (it.tags||[]).filter(Boolean),
+    tone: it.tone || null,
+    lang: it.lang || null,
+    rating: (typeof it.rating==="number" && !Number.isNaN(it.rating)) ? it.rating : null,
+    created_at: it.createdAt ? new Date(it.createdAt).toISOString() : new Date().toISOString(),
+    updated_at: it.updatedAt ? new Date(it.updatedAt).toISOString() : new Date().toISOString(),
+    deleted: false
+  };
+}
+function fromRemote(r){
+  return {
+    id: r.id,
+    text: r.text,
+    author: r.author || "",
+    link: r.link || "",
+    tags: r.tags || [],
+    tone: r.tone || "",
+    lang: r.lang || "",
+    rating: r.rating || "",
+    createdAt: r.created_at ? r.created_at.slice(0,10) : "",
+    updatedAt: r.updated_at || r.created_at,
+    deleted: !!r.deleted
+  };
+}
+</script>
+
 </script>
 </body>
 </html>
+
 
