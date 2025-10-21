@@ -11,15 +11,12 @@
   [data-theme="dark"]{
     --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --line:#273246; --primary:#7aa2ff;
   }
-
   html,body{height:100%}
   body{
     font-family:"Inter","Noto Sans SC",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
     background:var(--bg); color:var(--text);
     max-width:980px;margin:0 auto;padding:16px;
   }
-
-  /* 顶部导航 */
   .nav{
     display:flex;align-items:center;gap:12px;
     background:var(--card); border-radius:16px; padding:10px 14px; margin:8px 0 16px;
@@ -29,16 +26,13 @@
   .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),#64b5f6)}
   .title{font-weight:700}
   .nav-right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-
   .btn{border:1px solid var(--line); background:transparent; color:var(--text);
     border-radius:10px; padding:8px 12px; font-size:14px; cursor:pointer; transition:.2s}
   .btn:hover{border-color:var(--primary); color:var(--primary)}
   .btn.primary{background:var(--primary); color:#fff; border-color:transparent}
   .btn.primary:hover{opacity:.95}
   .btn.icon{width:40px;height:36px;display:flex;align-items:center;justify-content:center}
-
-  h1{display:none} /* 用导航标题取代 */
-
+  h1{display:none}
   .card{
     background:var(--card); border-radius:var(--radius);
     padding:20px; margin-bottom:var(--gap);
@@ -46,10 +40,8 @@
     transition:transform .2s, box-shadow .2s;
   }
   .card:hover{transform:translateY(-1px); box-shadow:0 8px 22px rgba(0,0,0,.08)}
-
   .row{display:flex;gap:var(--gap);flex-wrap:wrap}
   .row>*{flex:1 1 260px}
-
   input,textarea,select,button{
     width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
     background:transparent; color:var(--text); font-size:14px; transition:border .2s, box-shadow .2s
@@ -58,24 +50,18 @@
   textarea{min-height:90px; resize:vertical}
   a{color:var(--primary); text-decoration:none}
   a:hover{text-decoration:underline}
-
   .toolbar{display:flex;gap:var(--gap);flex-wrap:wrap;align-items:center}
   .actions{display:flex;gap:8px;flex-wrap:wrap}
   .divider{height:1px;background:linear-gradient(90deg,var(--line),transparent);margin:10px 0}
   .status{font-size:12px;color:var(--muted)}
   .status.ok{color:#22c55e}
   .status.warn{color:#eab308}
-
   .quote{white-space:pre-wrap; line-height:1.7}
   .muted{color:var(--muted); font-size:12px}
   .tag{display:inline-block;padding:3px 8px;border:1px solid var(--line);border-radius:999px;margin-right:6px;margin-top:6px;background:color-mix(in srgb,var(--line) 40%, transparent); font-size:12px}
-
   .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 10px;margin:4px 6px 0 0;font-size:12px;cursor:pointer}
   .pill.active{border-color:var(--primary); background:color-mix(in srgb,var(--primary) 20%, transparent); color:var(--text)}
-
   .list-empty{padding:24px;text-align:center;color:var(--muted)}
-
-  /* 手机端 */
   @media (max-width: 640px){
     body{padding:10px}
     .row>*{flex:1 1 100%}
@@ -113,10 +99,16 @@
 
       <div class="divider" style="flex-basis:100%"></div>
 
-      <!-- 登录 & 同步区 -->
+      <!-- 登录 & 同步区（方案B：邮箱+密码） -->
       <div class="row" style="align-items:center">
-        <input id="emailInput" placeholder="输入邮箱，接收登录邮件（云同步需要登录）" />
-        <button id="loginBtn" class="btn" style="flex:0 0 160px">发送登录邮件</button>
+        <input id="emailInput" placeholder="邮箱（用于登录/注册）" />
+        <input id="passwordInput" type="password" placeholder="密码（首次可自定义）" />
+        <button id="signupBtn" class="btn" style="flex:0 0 90px">注册</button>
+        <button id="loginBtn" class="btn" style="flex:0 0 90px">登录</button>
+
+        <!-- 保留邮件登录备选（可删除这两行） -->
+        <button id="linkLoginBtn" class="btn" style="flex:0 0 120px">邮件登录</button>
+
         <button id="logoutBtn" class="btn" style="flex:0 0 90px;display:none">退出</button>
         <button id="syncBtn" class="btn" style="flex:0 0 90px">同步</button>
         <div id="authState" class="status" style="flex:1 1 200px;text-align:right">未登录</div>
@@ -152,27 +144,20 @@
   <div id="list"></div>
 
 <script>
-/* ===================== 主题切换（自动记忆） ===================== */
+/* 主题切换（记忆） */
 const themeToggleBtn = document.getElementById('toggleTheme');
 const THEME_KEY = 'quotes.theme';
 const applyTheme = (t)=>{ document.documentElement.setAttribute('data-theme', t); themeToggleBtn.textContent = t==='dark'?'☀️':'🌙'; localStorage.setItem(THEME_KEY,t); };
 applyTheme(localStorage.getItem(THEME_KEY)|| (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light'));
 themeToggleBtn.onclick = ()=> applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
 
-/* ===================== 本地应用逻辑（你原有功能） ===================== */
+/* 本地应用逻辑（原有功能） */
 const KEY = "quotes.v1";
 const el = id => document.getElementById(id);
 
-const state = {
-  items: load(),
-  editingId: null,
-  activeTag: ""
-};
+const state = { items: load(), editingId: null, activeTag: "" };
 
-function load(){
-  try{ return JSON.parse(localStorage.getItem(KEY)) || []; }
-  catch{ return []; }
-}
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; } catch{ return []; } }
 function persist(){ localStorage.setItem(KEY, JSON.stringify(state.items)); }
 function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
 function nowISO(){ return new Date().toISOString().slice(0,10); }
@@ -181,30 +166,15 @@ function render(){
   renderTagBar();
   const q = el("search").value.trim().toLowerCase();
   const activeTag = state.activeTag;
-  const list = el("list");
-  list.innerHTML = "";
-
+  const list = el("list"); list.innerHTML = "";
   let items = [...state.items].sort((a,b)=> (b.createdAt||"").localeCompare(a.createdAt||""));
-
-  if(q){
-    items = items.filter(it =>
-      (it.text||"").toLowerCase().includes(q) ||
-      (it.author||"").toLowerCase().includes(q) ||
-      (it.tags||[]).join(",").toLowerCase().includes(q)
-    );
-  }
-  if(activeTag){
-    items = items.filter(it => (it.tags||[]).includes(activeTag));
-  }
-
-  if(items.length===0){
-    const d = document.createElement("div");
-    d.className="list-empty";
-    d.textContent = "没有内容，先收藏第一句吧 ✨";
-    list.appendChild(d);
-    return;
-  }
-
+  if(q){ items = items.filter(it =>
+    (it.text||"").toLowerCase().includes(q) ||
+    (it.author||"").toLowerCase().includes(q) ||
+    (it.tags||[]).join(",").toLowerCase().includes(q)
+  );}
+  if(activeTag){ items = items.filter(it => (it.tags||[]).includes(activeTag)); }
+  if(items.length===0){ const d = document.createElement("div"); d.className="list-empty"; d.textContent = "没有内容，先收藏第一句吧 ✨"; list.appendChild(d); return; }
   for(const it of items){
     const card = document.createElement("div");
     card.className = "card";
@@ -230,214 +200,133 @@ function render(){
 }
 
 function renderTagBar(){
-  const all = new Set();
-  state.items.forEach(it => (it.tags||[]).forEach(t=> all.add(t)));
-  const bar = el("tagBar");
-  bar.innerHTML = "";
-  if(all.size===0){ return; }
-  const mk = (name, active)=> {
-    const b = document.createElement("button");
-    b.className = "pill" + (active?" active":"");
-    b.textContent = name;
-    b.onclick = ()=>{ state.activeTag = (state.activeTag===name? "": name); render(); };
-    return b;
-  };
-  bar.appendChild(mk("全部", state.activeTag===""));
-  [...all].sort().forEach(t => bar.appendChild(mk(t, state.activeTag===t)));
+  const all = new Set(); state.items.forEach(it => (it.tags||[]).forEach(t=> all.add(t)));
+  const bar = el("tagBar"); bar.innerHTML = ""; if(all.size===0) return;
+  const mk = (name, active)=> { const b = document.createElement("button"); b.className = "pill" + (active?" active":""); b.textContent = name; b.onclick = ()=>{ state.activeTag = (state.activeTag===name? "": name); render(); }; return b; };
+  bar.appendChild(mk("全部", state.activeTag==="")); [...all].sort().forEach(t => bar.appendChild(mk(t, state.activeTag===t)));
 }
 
-function clearForm(){
-  el("text").value="";
-  el("author").value="";
-  el("link").value="";
-  el("tags").value="";
-  el("tone").value="";
-  el("lang").value="";
-  el("rating").value="";
-  state.editingId = null;
-  el("saveBtn").textContent = "保存";
-}
-
+function clearForm(){ el("text").value=""; el("author").value=""; el("link").value=""; el("tags").value=""; el("tone").value=""; el("lang").value=""; el("rating").value=""; state.editingId=null; el("saveBtn").textContent="保存"; }
 function splitTags(s){ return s.split(",").map(x=>x.trim()).filter(Boolean); }
 
 function saveItem(){
-  const text = el("text").value.trim();
-  if(!text){ alert("请先填写句子内容"); return; }
+  const text = el("text").value.trim(); if(!text){ alert("请先填写句子内容"); return; }
   const it = {
-    text,
-    author: el("author").value.trim(),
-    link: el("link").value.trim(),
-    tags: splitTags(el("tags").value),
-    tone: el("tone").value,
-    lang: el("lang").value,
+    text, author: el("author").value.trim(), link: el("link").value.trim(),
+    tags: splitTags(el("tags").value), tone: el("tone").value, lang: el("lang").value,
     rating: Number(el("rating").value||""),
   };
-
-  if(state.editingId){
-    const idx = state.items.findIndex(x=>x.id===state.editingId);
-    if(idx>-1){ state.items[idx] = {...state.items[idx], ...it, updatedAt: new Date().toISOString() }; }
-  }else{
-    state.items.unshift({ id: uid(), createdAt: nowISO(), updatedAt: new Date().toISOString(), ...it });
-  }
-  persist();
-  clearForm();
-  render();
+  if(state.editingId){ const idx = state.items.findIndex(x=>x.id===state.editingId); if(idx>-1){ state.items[idx] = {...state.items[idx], ...it, updatedAt: new Date().toISOString() }; } }
+  else{ state.items.unshift({ id: uid(), createdAt: nowISO(), updatedAt: new Date().toISOString(), ...it }); }
+  persist(); clearForm(); render();
   // —— 云同步队列（在下方 Supabase 段中接管） ——
 }
 
-function fillForm(it){
-  el("text").value = it.text||"";
-  el("author").value = it.author||"";
-  el("link").value = it.link||"";
-  el("tags").value = (it.tags||[]).join(", ");
-  el("tone").value = it.tone||"";
-  el("lang").value = it.lang||"";
-  el("rating").value = it.rating||"";
-  state.editingId = it.id;
-  el("saveBtn").textContent = "保存修改";
-  window.scrollTo({top:0,behavior:"smooth"});
-}
+function fillForm(it){ el("text").value=it.text||""; el("author").value=it.author||""; el("link").value=it.link||""; el("tags").value=(it.tags||[]).join(", "); el("tone").value=it.tone||""; el("lang").value=it.lang||""; el("rating").value=it.rating||""; state.editingId=it.id; el("saveBtn").textContent="保存修改"; window.scrollTo({top:0,behavior:"smooth"}); }
 
 function onListClick(e){
   if(e.target.tagName!=="BUTTON") return;
-  const act = e.target.dataset.act;
-  const id = e.target.dataset.id;
-  const item = state.items.find(x=>x.id===id);
-  if(!item) return;
-
-  if(act==="del"){
-    if(confirm("确定删除这条收藏吗？")){
-      state.items = state.items.filter(x=>x.id!==id);
-      persist(); render();
-      // —— 云同步队列（在下方 Supabase 段中接管） ——
-    }
-  }else if(act==="edit"){
-    fillForm(item);
-  }else if(act==="copy"){
-    navigator.clipboard.writeText(item.text).then(()=> {
-      e.target.textContent="已复制";
-      setTimeout(()=> e.target.textContent="复制句子",1000);
-    });
-  }
+  const act=e.target.dataset.act, id=e.target.dataset.id, item=state.items.find(x=>x.id===id); if(!item) return;
+  if(act==="del"){ if(confirm("确定删除这条收藏吗？")){ state.items=state.items.filter(x=>x.id!==id); persist(); render(); } }
+  else if(act==="edit"){ fillForm(item); }
+  else if(act==="copy"){ navigator.clipboard.writeText(item.text).then(()=>{ e.target.textContent="已复制"; setTimeout(()=> e.target.textContent="复制句子",1000); }); }
 }
 
-function exportJSON(){
-  const data = JSON.stringify(state.items, null, 2);
-  const blob = new Blob([data], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "quotes-backup.json"; a.click();
-  URL.revokeObjectURL(url);
-}
-
+function exportJSON(){ const data=JSON.stringify(state.items,null,2); const blob=new Blob([data],{type:"application/json"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="quotes-backup.json"; a.click(); URL.revokeObjectURL(url); }
 function importJSON(file){
-  const reader = new FileReader();
-  reader.onload = () => {
-    try{
-      const arr = JSON.parse(reader.result);
-      if(!Array.isArray(arr)) throw new Error("格式不正确");
-      const map = new Map(state.items.map(x=>[x.id,x]));
-      for(const it of arr){ if(it && it.id){ map.set(it.id, it); } }
-      state.items = [...map.values()];
-      persist(); render();
-      alert("导入完成");
-    }catch(e){ alert("导入失败："+e.message); }
-  };
-  reader.readAsText(file);
+  const reader=new FileReader(); reader.onload=()=>{ try{ const arr=JSON.parse(reader.result); if(!Array.isArray(arr)) throw new Error("格式不正确"); const map=new Map(state.items.map(x=>[x.id,x])); for(const it of arr){ if(it && it.id){ map.set(it.id,it); } } state.items=[...map.values()]; persist(); render(); alert("导入完成"); }catch(e){ alert("导入失败："+e.message); } }; reader.readAsText(file);
 }
+function randomOne(){ if(state.items.length===0){ alert("还没有内容"); return; } const it=state.items[Math.floor(Math.random()*state.items.length)]; alert((it.text||"")+(it.author? "\n\n— "+it.author:"")); }
+function escapeHTML(s){ return (s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-function randomOne(){
-  if(state.items.length===0){ alert("还没有内容"); return; }
-  const it = state.items[Math.floor(Math.random()*state.items.length)];
-  alert((it.text||"") + (it.author? "\n\n— "+it.author:""));
-}
-
-function escapeHTML(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-// events
-document.getElementById("saveBtn").onclick = saveItem;
-document.getElementById("resetBtn").onclick = clearForm;
-document.getElementById("list").addEventListener("click", onListClick);
-document.getElementById("search").addEventListener("input", render);
-document.getElementById("exportBtn").onclick = exportJSON;
-document.getElementById("importFile").addEventListener("change", e => e.target.files[0] && importJSON(e.target.files[0]));
-document.getElementById("navExport").onclick = exportJSON;
-document.getElementById("navImportFile").addEventListener("change", e => e.target.files[0] && importJSON(e.target.files[0]));
-document.getElementById("randomBtn").onclick = randomOne;
-document.getElementById("clearBtn").onclick = ()=> { if(confirm("这会清空本地所有收藏，确定吗？")){ state.items=[]; persist(); render(); } };
-
-// 顶部导航的“同步”按钮复用
-document.getElementById("navSync").onclick = ()=> document.getElementById("syncBtn").click();
+document.getElementById("saveBtn").onclick=saveItem;
+document.getElementById("resetBtn").onclick=clearForm;
+document.getElementById("list").addEventListener("click",onListClick);
+document.getElementById("search").addEventListener("input",render);
+document.getElementById("exportBtn").onclick=exportJSON;
+document.getElementById("importFile").addEventListener("change",e=> e.target.files[0] && importJSON(e.target.files[0]));
+document.getElementById("navExport").onclick=exportJSON;
+document.getElementById("navImportFile").addEventListener("change",e=> e.target.files[0] && importJSON(e.target.files[0]));
+document.getElementById("randomBtn").onclick=randomOne;
+document.getElementById("clearBtn").onclick=()=>{ if(confirm("这会清空本地所有收藏，确定吗？")){ state.items=[]; persist(); render(); } };
+document.getElementById("navSync").onclick=()=> document.getElementById("syncBtn").click();
 
 render();
 </script>
 
-<!-- ===================== Supabase 云同步（含手机登录修复） ===================== -->
+<!-- ===================== Supabase 云同步（方案B：邮箱+密码登录） ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-/** 1) 初始化 Supabase */
+/** 初始化 Supabase */
 const SUPABASE_URL = "https://wwtluqwioyngzawmkvam.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3dGx1cXdpb3luZ3phd21rdmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwMjc4NjEsImV4cCI6MjA3NjYwMzg2MX0.Jog8YR9_5XLK36LBPdzOP2ZXMkMRPhAeith0bPuqw8c";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/** 2) 登录/退出/同步 + 状态提示（改进：倒计时、回跳识别） */
-const $login = document.getElementById("loginBtn");
+const $signup = document.getElementById("signupBtn");
+const $login  = document.getElementById("loginBtn");
+const $linkLogin = document.getElementById("linkLoginBtn"); // 备选
 const $logout = document.getElementById("logoutBtn");
-const $sync = document.getElementById("syncBtn");
-const $email = document.getElementById("emailInput");
-const $state = document.getElementById("authState");
+const $sync   = document.getElementById("syncBtn");
+const $email  = document.getElementById("emailInput");
+const $pwd    = document.getElementById("passwordInput");
+const $state  = document.getElementById("authState");
 
-// 改成你的线上地址（HTTPS），同时在 Supabase 控制台将其加入 Redirect URLs
-const REDIRECT_URL = "https://avaiel.github.io/-/";
-
-$login.onclick = async () => {
-  const email = $email.value.trim();
-  if(!email) return alert("请输入邮箱");
-  $login.disabled = true;
-  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: REDIRECT_URL }});
+/** 邮箱 + 密码注册 */
+$signup.onclick = async () => {
+  const email = $email.value.trim(), password = $pwd.value.trim();
+  if(!email || !password) return alert("请先输入邮箱和密码");
+  const { data, error } = await sb.auth.signUp({ email, password });
   if(error){
-    alert("发送失败："+error.message);
-    $login.disabled = false;
+    alert("注册失败：" + error.message);
   }else{
-    // 30s 按钮倒计时，避免重复点击
-    let t = 30; $login.textContent = `已发送（${t}s）`;
-    const timer = setInterval(()=>{ t--; $login.textContent = `已发送（${t}s）`; if(t<=0){ clearInterval(timer); $login.textContent="发送登录邮件"; $login.disabled=false; }}, 1000);
-    alert("登录邮件已发送，请在手机邮箱中点击链接完成登录。");
+    // 若你在控制台开启了“Confirm email”，这里会返回需要验证；关闭则可直接登录。
+    alert("注册成功，如无法直接登录，请点击“登录”。");
   }
 };
+
+/** 邮箱 + 密码登录 */
+$login.onclick = async () => {
+  const email = $email.value.trim(), password = $pwd.value.trim();
+  if(!email || !password) return alert("请先输入邮箱和密码");
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error) return alert("登录失败：" + error.message);
+  setAuthUI(data.user); syncNow();
+};
+
+/** 邮件（Magic Link）登录作为备选（可删） */
+const REDIRECT_URL = "https://avaiel.github.io/-/";
+$linkLogin.onclick = async () => {
+  const email = $email.value.trim(); if(!email) return alert("请输入邮箱");
+  $linkLogin.disabled = true;
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: REDIRECT_URL }});
+  if(error){ alert("发送失败："+error.message); $linkLogin.disabled = false; }
+  else{
+    let t = 30; $linkLogin.textContent = `已发送（${t}s）`;
+    const timer = setInterval(()=>{ t--; $linkLogin.textContent = `已发送（${t}s）`; if(t<=0){ clearInterval(timer); $linkLogin.textContent="邮件登录"; $linkLogin.disabled=false; }}, 1000);
+    alert("登录邮件已发送。如在邮箱App内无法回跳，请选择“在浏览器中打开”。");
+  }
+};
+
+/** 退出/同步/状态 */
 $logout.onclick = async () => { await sb.auth.signOut(); setAuthUI(null); };
 $sync.onclick = syncNow;
-
-// 处理从邮箱回跳（hash 或 code 参数），并清理地址栏
-(async ()=>{
-  try{
-    if (location.search.includes("code=")) {
-      // 新版 code 方式
-      await sb.auth.exchangeCodeForSession(window.location.href);
-      history.replaceState({}, document.title, REDIRECT_URL);
-    } else if (location.hash.includes("access_token")) {
-      // 旧版 hash 方式
-      await sb.auth.getSessionFromUrl({ storeSession:true });
-      history.replaceState({}, document.title, REDIRECT_URL);
-    }
-  }catch(e){ console.error("处理回跳失败：", e); }
-})();
 
 sb.auth.onAuthStateChange((_evt, sess)=> setAuthUI(sess?.user || null));
 (async () => { const s = await sb.auth.getSession(); setAuthUI(s.data.session?.user||null); })();
 
 function setAuthUI(user){
   if(user){
-    $login.style.display="none"; $logout.style.display=""; $email.style.display="none";
+    $signup.style.display="none"; $login.style.display="none"; $linkLogin.style.display="none";
+    $logout.style.display=""; $email.style.display="none"; $pwd.style.display="none";
     $state.textContent = `已登录：${user.email}`; $state.className="status ok";
-    syncNow(); // 登录后自动同步一次
   }else{
-    $login.style.display=""; $logout.style.display="none"; $email.style.display="";
+    $signup.style.display=""; $login.style.display=""; $linkLogin.style.display="";
+    $logout.style.display="none"; $email.style.display=""; $pwd.style.display="";
     $state.textContent = "未登录"; $state.className="status warn";
   }
 }
 
-/** 3) 离线队列（保存/删除入队等待上行） */
+/** —— 离线队列（保存/删除入队等待上行） —— */
 const QUEUE_KEY = "quotes.queue.v1";
 const getQueue = ()=> { try{return JSON.parse(localStorage.getItem(QUEUE_KEY))||[]}catch{return[]} };
 const setQueue = q => localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
@@ -461,17 +350,15 @@ document.addEventListener("click", (e)=>{
   }
 }, true);
 
-/** 4) 同步（合并：谁新用谁） */
+/** —— 同步（合并：谁新用谁） —— */
 async function syncNow(){
   const sess = await sb.auth.getSession();
   const user = sess?.data?.session?.user;
-  if(!user){ alert("请先登录邮箱以开启同步"); return; }
+  if(!user){ alert("请先登录以开启同步"); return; }
 
-  // 拉取云端
   const { data:remote, error } = await sb.from("quotes").select("*").order("updated_at",{ascending:false});
   if(error){ console.error(error); alert("云端拉取失败："+error.message); return; }
 
-  // 合并
   const local = load();
   const map = new Map();
   const put = (r)=>{ if(!r?.id) return;
@@ -482,7 +369,6 @@ async function syncNow(){
   };
   remote.forEach(put); local.forEach(put);
 
-  // 上行离线队列
   const q = getQueue();
   for(const item of q){
     if(item.op==="upsert"){
@@ -496,7 +382,6 @@ async function syncNow(){
   }
   setQueue([]);
 
-  // 落回本地并刷新
   state.items = [...map.values()].filter(r=>!r.deleted).map(fromRemote);
   persist(); render();
   console.log("Sync done");
@@ -534,12 +419,8 @@ function fromRemote(r){
   };
 }
 
-/** 5) 登录后每 5 分钟自动同步 */
-setInterval(async ()=>{
-  const s = await sb.auth.getSession();
-  if(s?.data?.session?.user){ syncNow(); }
-}, 5*60*1000);
+/** 登录后每 5 分钟自动同步 */
+setInterval(async ()=>{ const s = await sb.auth.getSession(); if(s?.data?.session?.user){ syncNow(); } }, 5*60*1000);
 </script>
 </body>
 </html>
-
