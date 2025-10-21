@@ -352,39 +352,54 @@ document.addEventListener("click", (e)=>{
 
 /** —— 同步（合并：谁新用谁） —— */
 async function syncNow(){
-  const sess = await sb.auth.getSession();
-  const user = sess?.data?.session?.user;
-  if(!user){ alert("请先登录以开启同步"); return; }
+  const btn = document.getElementById("syncBtn");
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = "正在同步…";
 
-  const { data:remote, error } = await sb.from("quotes").select("*").order("updated_at",{ascending:false});
-  if(error){ console.error(error); alert("云端拉取失败："+error.message); return; }
+  try {
+    const sess = await sb.auth.getSession();
+    const user = sess?.data?.session?.user;
+    if(!user){ alert("请先登录以开启同步"); return; }
 
-  const local = load();
-  const map = new Map();
-  const put = (r)=>{ if(!r?.id) return;
-    const existed = map.get(r.id);
-    const a = (r.updatedAt||r.updated_at||r.createdAt||r.created_at||"");
-    const b = existed&&(existed.updatedAt||existed.updated_at||existed.createdAt||existed.created_at||"");
-    if(!existed || a>b) map.set(r.id, r);
-  };
-  remote.forEach(put); local.forEach(put);
+    // 拉取云端
+    const { data:remote, error:err1 } = await sb.from("quotes").select("*").order("updated_at",{ascending:false});
+    if(err1){ console.error(err1); alert("云端拉取失败："+err1.message); return; }
 
-  const q = getQueue();
-  for(const item of q){
-    if(item.op==="upsert"){
-      const row = normalizeRow(item.row);
-      const { error:e1 } = await sb.from("quotes").upsert(row, { onConflict:"id" });
-      if(e1) console.error(e1); else put(row);
-    }else if(item.op==="delete"){
-      const { error:e2 } = await sb.from("quotes").update({ deleted:true }).eq("id", item.id);
-      if(e2) console.error(e2); else map.delete(item.id);
+    // 合并
+    const local = load();
+    const map = new Map();
+    const put = (r)=>{ if(!r?.id) return;
+      const existed = map.get(r.id);
+      const a = (r.updatedAt||r.updated_at||r.createdAt||r.created_at||"");
+      const b = existed&&(existed.updatedAt||existed.updated_at||existed.createdAt||existed.created_at||"");
+      if(!existed || a>b) map.set(r.id, r);
+    };
+    remote.forEach(put); local.forEach(put);
+
+    // 上行离线队列
+    const q = getQueue();
+    for(const item of q){
+      if(item.op==="upsert"){
+        const row = normalizeRow(item.row);
+        const { error:e1 } = await sb.from("quotes").upsert(row, { onConflict:"id" });
+        if(e1){ console.error(e1); alert("上行失败："+e1.message); return; } else { put(row); }
+      }else if(item.op==="delete"){
+        const { error:e2 } = await sb.from("quotes").update({ deleted:true }).eq("id", item.id);
+        if(e2){ console.error(e2); alert("删除失败："+e2.message); return; } else { map.delete(item.id); }
+      }
     }
-  }
-  setQueue([]);
+    setQueue([]);
 
-  state.items = [...map.values()].filter(r=>!r.deleted).map(fromRemote);
-  persist(); render();
-  console.log("Sync done");
+    // 落地渲染
+    state.items = [...map.values()].filter(r=>!r.deleted).map(fromRemote);
+    persist(); render();
+    btn.textContent = "同步完成 ✅";
+  } catch (e) {
+    console.error(e);
+    alert("同步异常："+ e.message);
+  } finally {
+    setTimeout(()=>{ btn.disabled = false; btn.textContent = old; }, 1200);
+  }
 }
 
 /** 结构转换：前端 <-> 数据库 */
@@ -424,3 +439,4 @@ setInterval(async ()=>{ const s = await sb.auth.getSession(); if(s?.data?.sessio
 </script>
 </body>
 </html>
+
